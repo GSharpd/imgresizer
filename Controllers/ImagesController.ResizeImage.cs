@@ -13,10 +13,11 @@ namespace imgresizer.Controllers
 {
     public partial class ImagesController : Controller
     {
-        [HttpGet("api/images/resize")]
+        [HttpGet("api/resize")]
         public async Task<IActionResult> ResizeImage(
             [FromQuery]ResizeRequestModel requestModel,
-            [FromServices]IWebHostEnvironment env
+            [FromServices]IWebHostEnvironment env,
+            [FromServices]ImageConverter converter
             )
         {
             if(!ModelState.IsValid)
@@ -32,18 +33,15 @@ namespace imgresizer.Controllers
             }
 
             var options = ConversionOptionsFactory.FromResizeRequest(requestModel);
+            var imageSource = await System.IO.File.ReadAllBytesAsync(filepath);
+            var result = await converter.Convert(imageSource, options);
 
-            using(var memory = new MemoryStream())
-            using (var image = new MagickImage(filepath))
+            if(result.Length == 0)
             {
-                image.Resize(options.Width, options.Height);
-                image.Strip();
-                image.Quality = options.Quality;
-                image.Format = options.TargetFormat;
-                image.Write(memory);
-                var file = memory.ToArray();
-                return File(file, options.TargetMimeType);
+                return BadRequest("Could not convert file.");
             }
+
+            return File(result, options.TargetMimeType);
         }
     }
 }
