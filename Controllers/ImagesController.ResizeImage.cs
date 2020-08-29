@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ImageMagick;
 using imgresizer.Converter;
 using imgresizer.Models;
+using imgresizer.Storage;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,6 +18,7 @@ namespace imgresizer.Controllers
         public async Task<IActionResult> ResizeImage(
             [FromQuery]ResizeRequestModel requestModel,
             [FromServices]IWebHostEnvironment env,
+            [FromServices]StorageService storage,
             [FromServices]ImageConverter converter
             )
         {
@@ -25,15 +27,15 @@ namespace imgresizer.Controllers
                 return BadRequest(ModelState);
             }
 
-            var filepath = Path.Combine(env.ContentRootPath, "Images", requestModel.Name);
-            var fileExists = System.IO.File.Exists(filepath);
+            (var fileExists, var blobFile) = await storage.TryGetFile(requestModel.Name);
+
             if (!fileExists)
             {
                 return NotFound();
             }
 
             var options = ConversionOptionsFactory.FromResizeRequest(requestModel);
-            var imageSource = await System.IO.File.ReadAllBytesAsync(filepath);
+            var imageSource = await storage.GetBlobBytes(blobFile);
             var result = await converter.Convert(imageSource, options);
 
             if(result.Length == 0)
